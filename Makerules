@@ -342,7 +342,8 @@ ifeq "$(OS)" "pyodide"
   HAVE_X11=no
   HAVE_OBJCOPY=no
   HAVE_LIBCRYPTO=no
-  CFLAGS += -pthread
+  #CFLAGS += -pthread -sERROR_ON_UNDEFINED_SYMBOLS=0
+  #CFLAGS += -sERROR_ON_UNDEFINED_SYMBOLS=0
 endif
 
 ifeq "$(OS)" "mingw32-cross"
