@@ -1646,6 +1646,7 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
                     jlib.log( 'Compiling generated C++ source code to create libmupdfcpp.so ...')
                     include1 = f'{build_dirs.dir_mupdf}/include'
                     include2 = f'{build_dirs.dir_mupdf}/platform/c++/include'
+                    include3 = f'{build_dirs.dir_mupdf}/thirdparty/freetype/include'
                     cpp_files_text = ''
                     for i in cpp_files:
                         cpp_files_text += ' ' + os.path.relpath(i)
@@ -1711,12 +1712,13 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
                                     {cflags}
                                     -I {include1}
                                     -I {include2}
+                                    -I {include3}
                                     {cpp_files_text}
                                     {link_l_flags(libmupdf)}
                                 ''')
                                 )
                         command_was_run = jlib.build(
-                                [include1, include2] + cpp_files,
+                                [include1, include2, include3] + cpp_files,
                                 libmupdfcpp,
                                 command,
                                 force_rebuild,
@@ -1727,6 +1729,7 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
                             jlib.system(f'ln -sf libmupdfcpp.so{so_version} {build_dirs.dir_so}/libmupdfcpp.so')
 
                     elif 'fpic' in dir_so_flags:
+                        assert 0
                         # We build a .so containing the C and C++ API. This
                         # might be slightly faster than having separate C and
                         # C++ API .so files, but probably makes no difference.
@@ -2039,8 +2042,9 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
 
                     # These are the input files to our g++ command:
                     #
-                    include1        = f'{build_dirs.dir_mupdf}/include'
-                    include2        = f'{build_dirs.dir_mupdf}/platform/c++/include'
+                    include1    = f'{build_dirs.dir_mupdf}/include'
+                    include2    = f'{build_dirs.dir_mupdf}/platform/c++/include'
+                    include3    = f'{build_dirs.dir_mupdf}/thirdparty/freetype/include'
 
                     if 'shared' in dir_so_flags:
                         libmupdf        = f'{build_dirs.dir_so}/libmupdf.so{so_version}'
@@ -2096,6 +2100,7 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
                                         {cflags}
                                         -I {include1}
                                         -I {include2}
+                                        -I {include3}
                                         {flags_compile}
                                         {flags_link2}
                                         {link_l_flags( [libmupdf, libmupdfcpp])}
@@ -2106,6 +2111,7 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
                                     cpp2_path,
                                     include1,
                                     include2,
+                                    include3,
                                     libmupdf,
                                     libmupdfcpp,
                                     ]
@@ -2147,6 +2153,7 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
                                     {cflags}
                                     -I {include1}
                                     -I {include2}
+                                    -I {include3}
                                     {flags_compile}
                                     -Wno-deprecated-declarations
                                     -Wno-free-nonheap-object
@@ -2157,6 +2164,7 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
                                 cpp_path,
                                 include1,
                                 include2,
+                                include3,
                                 ]
                         jlib.build(
                                 infiles,
@@ -2202,6 +2210,7 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
                                     {cflags}
                                     -I {include1}
                                     -I {include2}
+                                    -I {include3}
                                     {flags_compile}
                                     -Wno-deprecated-declarations
                                     -Wno-free-nonheap-object
@@ -2214,6 +2223,7 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
                                 cpp_path,
                                 include1,
                                 include2,
+                                include3,
                                 libmupdf,
                                 ]
                         infiles += sos
