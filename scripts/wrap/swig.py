@@ -1004,7 +1004,6 @@ def build_swig(
             {{
                 %template(vectoruc) vector<unsigned char>;
                 %template(vectori) vector<int>;
-                %template(vectorul) vector<unsigned long>;
                 %template(vectorf) vector<float>;
                 %template(vectord) vector<double>;
                 %template(vectors) vector<std::string>;

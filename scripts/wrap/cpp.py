@@ -1093,14 +1093,9 @@ g_extra_declarations = textwrap.dedent(f'''
         must end with one of 'efg' otherwise we throw an exception. */
         std::string fz_format_double(fz_context* ctx, const char* fmt, double value);
 
-        /* Returns vector mapping from gid to ucs for specified font. Returned
-        vector has elements where [gid] = ucs. */
-        std::vector<unsigned long> fz_ft_font_reverse_cmap(fz_font* font);
         ''')
 
 g_extra_definitions = textwrap.dedent(f'''
-
-        #include "mupdf/functions.h"
 
         FZ_FUNCTION std::string fz_lookup_metadata2( fz_context* ctx, fz_document* doc, const char* key)
         {{
@@ -1313,41 +1308,6 @@ g_extra_definitions = textwrap.dedent(f'''
             s_format_check(ctx, fmt, "efg");
             fz_snprintf(buffer, sizeof(buffer), fmt, value);
             return buffer;
-        }}
-
-        /* Include freetype headers in same way as source/pdf/pdf-font-add.c. */
-        #include <ft2build.h>
-        #include FT_FREETYPE_H
-        #ifdef FT_FONT_FORMATS_H
-        #include FT_FONT_FORMATS_H
-        #else
-        #include FT_XFREE86_H
-        #endif
-        #include FT_TRUETYPE_TABLES_H
-
-        #ifndef FT_SFNT_HEAD
-        #define FT_SFNT_HEAD ft_sfnt_head
-        #endif
-
-        std::vector<unsigned long> fz_ft_font_reverse_cmap(fz_font* font)
-        {{
-            FT_Face face = (FT_Face) font->ft_face;
-            std::vector<unsigned long> ret(face->num_glyphs);
-            unsigned int gid;
-            mupdf::ll_fz_ft_lock();
-            for (
-                    unsigned long ucs = FT_Get_First_Char(face, &gid);
-                    gid > 0;
-                    ucs = FT_Get_Next_Char(face, ucs, &gid)
-                    )
-            {{
-                if (gid < ret.size())
-                {{
-                    ret[gid] = ucs;
-                }}
-            }}
-            mupdf::ll_fz_ft_unlock();
-            return ret;
         }}
         ''')
 
