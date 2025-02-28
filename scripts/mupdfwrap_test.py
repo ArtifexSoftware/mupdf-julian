@@ -211,6 +211,20 @@ def test_install_load_system_font(path):
     assert not font.m_internal
 
 
+def test_barcode():
+    # This should either succeed or raise an expected exception.
+    try:
+        pixmap = mupdf.fz_new_barcode_pixmap(
+                mupdf.FZ_BARCODE_QRCODE, "http://artifex.com",
+                size=512,
+                ec_level=4,
+                quiet=0,
+                hrt=1,
+                )
+    except Exception as e:
+        assert 'Barcode functionality not included' in str(e)
+
+
 def test(path):
     '''
     Runs various mupdf operations on <path>, which is assumed to be a file that
@@ -223,6 +237,8 @@ def test(path):
     g_test_n += 1
 
     test_install_load_system_font(path)
+
+    test_barcode()
 
     # See notes in wrap/swig.py:build_swig() about buffer_extract() and
     # buffer_storage().
