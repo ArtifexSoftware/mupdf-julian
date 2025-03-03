@@ -1122,11 +1122,13 @@ def _get_m_command( build_dirs, j=None, make=None, m_target=None, m_vars=None):
                 make_env += ' XLIB_LDFLAGS=-Wl,-Bsymbolic'
             elif flag == 'barcode':
                 make_env += ' barcode=yes'
-            elif flag == 'Py_LIMITED_API':
+            elif flag in ('Py_LIMITED_API', 'PLA'):
                 pass
             elif flag.startswith('Py_LIMITED_API='):    # fixme: obsolete.
                 pass
             elif flag.startswith('Py_LIMITED_API_'):
+                pass
+            elif flag.startswith('PLA_'):
                 pass
             else:
                 jlib.log(f'Ignoring unrecognised flag {flag!r} in {flags!r} in {build_dirs.dir_so!r}')
