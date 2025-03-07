@@ -88,6 +88,7 @@ class ClassExtra:
             opaque=False,
             pod=False,
             virtual_fnptrs=False,
+            mutex=False,
             ):
         '''
         accessors:
@@ -270,6 +271,9 @@ class ClassExtra:
             then use SWIG's 'Director' support to allow these virtual methods
             to be overridden in Python/C#. Thus one can make MuPDF function
             pointers call Python/C# code.
+        mutex:
+            If true all access to class wrapper needs to be serialised. We add
+            extra member `std::mutex m_mutex;` to the wrapper class.
         '''
         if accessors is None and pod is True:
             accessors = True
@@ -295,6 +299,7 @@ class ClassExtra:
         self.opaque = opaque
         self.pod = pod
         self.virtual_fnptrs = virtual_fnptrs
+        self.mutex = mutex
 
         assert self.pod in (False, True, 'inline', 'none'), f'{self.pod}'
 
@@ -334,6 +339,7 @@ class ClassExtra:
         ret += f' opaque={self.opaque}'
         ret += f' pod={self.pod}'
         ret += f' virtual_fnptrs={self.virtual_fnptrs}'
+        ret += f' mutex={self.mutex}'
         return ret
 
 
@@ -605,6 +611,7 @@ classextras = ClassExtras(
                         '''),
                     ),
                 constructor_raw = True,
+                mutex = True,
                 ),
 
         fz_document = ClassExtra(
@@ -632,6 +639,7 @@ classextras = ClassExtras(
                 method_wrappers_static = [
                     'fz_new_xhtml_document_from_document',
                     ],
+                mutex = True,
                 ),
 
         # This is a little complicated. Many of the functions that we would
@@ -1771,6 +1779,7 @@ classextras = ClassExtras(
                         f'/* Returns wrapper for .super member. */',
                         ),
                     ],
+                mutex = True,
                 ),
 
         pdf_filter_factory = ClassExtra(

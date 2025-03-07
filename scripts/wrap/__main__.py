@@ -1227,6 +1227,7 @@ def build_0(
         clang_info_verbose,
         refcheck_if,
         trace_if,
+        threadsafe_if,
         cpp_files,
         h_files,
         ):
@@ -1275,6 +1276,7 @@ def build_0(
             clang_info_verbose,
             refcheck_if,
             trace_if,
+            threadsafe_if,
             'debug' in build_dirs.dir_so,
             )
 
@@ -1455,6 +1457,7 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
     j = 0
     refcheck_if = '#ifndef NDEBUG'
     trace_if = '#ifndef NDEBUG'
+    threadsafe_if = '#if 1'
     pyodide = state.state_.pyodide
     if pyodide:
         # Looks like Pyodide sets CXX to (for example) /tmp/tmp8h1meqsj/c++. We
@@ -1586,6 +1589,7 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
                         clang_info_verbose,
                         refcheck_if,
                         trace_if,
+                        threadsafe_if,
                         cpp_files,
                         h_files,
                         )
@@ -2414,6 +2418,7 @@ def main2():
     #
     swig_command = 'swig'
     make_command = None
+    test_gdb = ''
 
     # Whether to use `devenv.com /upgrade`.
     #
@@ -2767,9 +2772,14 @@ def main2():
                     jlib.system(command, verbose=1)
                     jlib.system( 'pwd', verbose=1)
                     if state.state_.macos:
-                        jlib.system( f'DYLD_LIBRARY_PATH={build_dirs.dir_so} {exe}', verbose=1)
+                        jlib.system( f'DYLD_LIBRARY_PATH={build_dirs.dir_so} {test_gdb}{exe}', verbose=1)
                     else:
-                        jlib.system( f'{exe} {testfile}', verbose=1, env_extra=dict(LD_LIBRARY_PATH=build_dirs.dir_so))
+                        jlib.system( f'{test_gdb}{exe} {testfile}', verbose=1, env_extra=dict(LD_LIBRARY_PATH=build_dirs.dir_so))
+
+            elif arg == '--test-gdb':
+                test_gdb = next(args)
+                if test_gdb:
+                    test_gdb += ' '
 
             elif arg == '--test-internal':
                 _test_get_m_command()

@@ -870,6 +870,8 @@ def build_swig(
 
             %ignore fz_open_file_w;
 
+            %ignore m_mutex;
+
             %ignore {rename.ll_fn('fz_append_vprintf')};
             %ignore {rename.ll_fn('fz_error_stack_slot_s')};
             %ignore {rename.ll_fn('fz_format_string')};

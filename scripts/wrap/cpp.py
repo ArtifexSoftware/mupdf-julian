@@ -1728,6 +1728,7 @@ def make_function_wrappers(
         generated,
         refcheck_if,
         trace_if,
+        threadsafe_if,
         ):
     '''
     Generates C++ source code containing wrappers for all fz_*() functions.
@@ -2121,6 +2122,7 @@ def make_function_wrappers(
                     fn_cursor=cursor,
                     refcheck_if=refcheck_if,
                     trace_if=trace_if,
+                    threadsafe_if=threadsafe_if,
                     fnname=fnname,
                     out_h=out_functions_h2,
                     out_cpp=out_functions_cpp2,
@@ -2769,6 +2771,7 @@ def function_wrapper_class_aware_body(
         wrap_return,
         refcheck_if,
         trace_if,
+        threadsafe_if,
         ):
     '''
     Writes function or method body to <out_cpp> that calls a generated C++ wrapper
@@ -2804,6 +2807,11 @@ def function_wrapper_class_aware_body(
         address of this value.
 
         Otherwise we don't wrap the returned value.
+    refcheck_if
+    trace_if
+    threadsafe_if
+        Preprocessor #if* statements to conditionally include specific types of
+        generated code, such as `#if 1` or `#ifndef NDEBUG`.
     '''
     verbose = state.state_.show_details( fnname)
     out_cpp.write( f'{{\n')
@@ -2825,8 +2833,8 @@ def function_wrapper_class_aware_body(
         out_cpp.write( f'    va_end( ap);\n')
 
     elif class_constructor or not struct_name:
-        # This code can generate a class method, but we choose to not use this,
-        # instead method body simply calls the class-aware function (see below).
+        # Class constructor or not a class method. Generate the full
+        # implementation.
         def get_keep_drop(arg):
             name = util.clip( arg.alt.type.spelling, 'struct ')
             if name.startswith('fz_'):
@@ -2851,6 +2859,26 @@ def function_wrapper_class_aware_body(
                     out_cpp.write( f'    /* Out-param {arg.name}.m_internal will be overwritten. */\n')
                     out_cpp.write( f'    {drop_fn}({arg.name}.m_internal);\n')
                     out_cpp.write( f'    {arg.name}.m_internal = nullptr;\n')
+
+        # Look for wrapper class args with a mutex.
+        args_mutex = list()
+        for arg in parse.get_args( tu, fn_cursor):
+            if arg.alt:
+                arg_extras = classes.classextras.get( tu, arg.alt.type.spelling)
+                if arg_extras.mutex:
+                    args_mutex.append(arg)
+        if args_mutex:
+            # Sort mutex-requiring args to avoid deadlocks, and generate code
+            # to lock them.
+            # Todo: with C++17 we could use `std::scoped_lock(*args_mutex)`.
+            #
+            args_mutex.sort(key=lambda arg: arg.alt.type.spelling)
+            out_cpp.write( f'    \n')
+            out_cpp.write( f'    {threadsafe_if}\n')
+            for i, arg_mutex in enumerate(args_mutex):
+                out_cpp.write( f'    std::lock_guard<std::mutex>     internal_lock_{i}({arg_mutex.name}.m_mutex);\n')
+            out_cpp.write( f'    #endif\n')
+            out_cpp.write( f'    \n')
 
         # Write function call.
         if class_constructor:
@@ -2957,8 +2985,8 @@ def function_wrapper_class_aware_body(
                         out_cpp.write( f'    /* We assume that out-param {arg.name}.m_internal is a borrowed reference. */\n')
                         out_cpp.write( f'    {keep_fn}({arg.name}.m_internal);\n')
     else:
-        # Class method simply calls the class-aware function, which will have
-        # been generated elsewhere.
+        # Generate class method that simply calls the class-aware function,
+        # which will have been previously generated above.
         out_cpp.write( '    ')
         if not return_void:
             out_cpp.write( 'auto ret = ')
@@ -3009,6 +3037,7 @@ def function_wrapper_class_aware(
         fn_cursor,
         refcheck_if,
         trace_if,
+        threadsafe_if,
         class_static=False,
         class_constructor=False,
         extras=None,
@@ -3378,6 +3407,7 @@ def function_wrapper_class_aware(
             wrap_return,
             refcheck_if,
             trace_if,
+            threadsafe_if,
             )
 
     if struct_name:
@@ -4335,6 +4365,7 @@ def class_wrapper(
         generated,
         refcheck_if,
         trace_if,
+        threadsafe_if,
         ):
     '''
     Creates source for a class called <classname> that wraps <struct_name>,
@@ -4460,6 +4491,7 @@ def class_wrapper(
                     cursor,
                     refcheck_if,
                     trace_if,
+                    threadsafe_if,
                     class_static=False,
                     class_constructor=True,
                     extras=extras,
@@ -4581,6 +4613,7 @@ def class_wrapper(
                 fn_cursor=None,
                 refcheck_if=refcheck_if,
                 trace_if=trace_if,
+                threadsafe_if=threadsafe_if,
                 class_static=True,
                 struct_cursor=struct_cursor,
                 generated=generated,
@@ -4605,6 +4638,7 @@ def class_wrapper(
                 None, #fn_cursor
                 refcheck_if,
                 trace_if,
+                threadsafe_if,
                 struct_cursor=struct_cursor,
                 generated=generated,
                 debug=state.state_.show_details(fnname),
@@ -4763,6 +4797,15 @@ def class_wrapper(
         # swig-4.02 with "Error: Syntax error in input(3).".
         out_h.write( f'    /** Pointer to wrapped data. */\n')
         out_h.write( f'    ::{struct_name}* m_internal;\n')
+
+    if extras.mutex:
+        out_h.write(f'    \n')
+        out_h.write(f'    /* {struct_name} is not threadsafe, so we add a mutex to be locked\n')
+        out_h.write(f'    by all class-aware functions that take {classname} arg(s).\n')
+        out_h.write(f'    */\n')
+        out_h.write(f'    {threadsafe_if}\n')
+        out_h.write(f'    mutable std::mutex m_mutex;\n')
+        out_h.write(f'    #endif\n')
 
     # Declare static `num_instances` variable.
     out_h.write(  '\n')
@@ -5050,6 +5093,7 @@ def cpp_source(
         clang_info_version,
         refcheck_if,
         trace_if,
+        threadsafe_if,
         debug,
         ):
     '''
@@ -5374,6 +5418,7 @@ def cpp_source(
             #include "mupdf/pdf.h"
 
             #include <map>
+            #include <mutex>
             #include <string>
             #include <vector>
 
@@ -5470,6 +5515,12 @@ def cpp_source(
             #else
                 static const int    s_trace = mupdf::internal_env_flag_check_unset("{trace_if}", "MUPDF_trace");
             #endif
+
+            //{threadsafe_if}
+            //    static const int    s_threadsafe = mupdf::internal_env_flag("MUPDF_threadsafe");
+            //#else
+            //    static const int    s_threadsafe = mupdf::internal_env_flag_check_unset("{threadsafe_if}", "MUPDF_threadsafe");
+            //#endif
             '''))
 
     namespace = 'mupdf'
@@ -5539,6 +5590,7 @@ def cpp_source(
             generated,
             refcheck_if,
             trace_if,
+            threadsafe_if,
             )
 
     fn_usage = dict()
@@ -5695,6 +5747,7 @@ def cpp_source(
                     generated,
                     refcheck_if,
                     trace_if,
+                    threadsafe_if,
                     )
         if is_container:
             generated.container_classnames.append( classname)
