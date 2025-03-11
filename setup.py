@@ -38,13 +38,43 @@ import platform
 import re
 import subprocess
 import sys
+import sys
 import time
 
-
+root = os.path.dirname(__file__)
 def log(text=''):
     for line in text.split('\n'):
         print(f'mupdf:setup.py: {line}')
     sys.stdout.flush()
+
+
+log(f'{root=}')
+log(f'{os.stat(root)=}')
+log(f'{os.stat(".")=}')
+
+log(f'sys.path:')
+for p in sys.path:
+    pp = os.path.realpath(p)
+    log(f'    {p}')
+    log(f'        {pp}')
+    try:
+        st = os.stat(p)
+    except Exception:
+        log(f'        [stat fail]')
+    else:
+        log(f'        {st.st_ino=}')
+
+log(f'{sys.version=}')
+log(f'{dir(platform)=}')
+log(f'{platform.__file__=}')
+log(f'{sys.path=}')
+log(f'{os.getcwd()=}')
+log(f'{os.getenv("PYTHONPATH")=}')
+for i in dir(platform):
+    try:
+        log(f'platform.{i}: {getattr(platform, i)!r}')
+    except Exception as e:
+        log(f'platform.{i} unknown: {e}')
 
 def cache(function):
     '''

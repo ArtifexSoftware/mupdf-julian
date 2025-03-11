@@ -612,6 +612,14 @@ Usage:
                     runtime diagnostics code. For example use `--trace-if
                     '#if 1'` to always enable, `--refcheck-if '#if 0'` to
                     always disable. Default is '#ifndef NDEBUG'.
+                --threadsafe-if <text>
+                    Set text used to determine whether to enabling thread
+                    safety for devices and documents.
+
+                    For example use `--threadsafe-if '#if 1'` to always enable,
+                    `--refcheck-if '#if 0'` to always disable.
+
+                    As of 2025-03-07 the default is '#if 0'.
                 --python
                 --csharp
                     Whether to generated bindings for python or C#. Default is
@@ -1457,7 +1465,7 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
     j = 0
     refcheck_if = '#ifndef NDEBUG'
     trace_if = '#ifndef NDEBUG'
-    threadsafe_if = '#if 1'
+    threadsafe_if = '#if 0'
     pyodide = state.state_.pyodide
     if pyodide:
         # Looks like Pyodide sets CXX to (for example) /tmp/tmp8h1meqsj/c++. We
@@ -1529,6 +1537,11 @@ def build( build_dirs, swig_command, args, vs_upgrade, make_command):
         elif actions == '--refcheck-if':
             refcheck_if = args.next()
             jlib.log( 'Have set {refcheck_if=}')
+        elif actions == '--threadsafe-if':
+            threadsafe_if = args.next()
+            if not threadsafe_if.startswith(f'#'):
+                threadsafe_if = f'#if {threadsafe_if}'
+            jlib.log(f'Have set {threadsafe_if=}.')
         elif actions == '--trace-if':
             trace_if = args.next()
             jlib.log( 'Have set {trace_if=}')
