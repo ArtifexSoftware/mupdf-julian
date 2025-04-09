@@ -2584,6 +2584,44 @@ def num_instances(refcheck_if, delta, name):
     ret += '    #endif\n'
     return ret
 
+def get_classname_keep_drop(cursor_struct):
+    name = util.clip( cursor_struct.alt.type.spelling, 'struct ')
+    classname = rename.class_(name)
+    if name.startswith('fz_'):
+        prefix = 'fz'
+        name = name[3:]
+    elif name.startswith('pdf_'):
+        prefix = 'pdf'
+        name = name[4:]
+    else:
+        assert 0
+    return class_rename.ll_fn(f'{prefix}_keep_{name}'), rename.ll_fn(f'{prefix}_drop_{name}')
+
+
+def do_keepdrop(out_cpp, cursor_struct, this, delta, do_check=1, do_keepdrop=1):
+    '''
+    this:
+        Name of pointer to wrapper class instance.
+    '''
+    assert delta in (-1, 0, +1)
+    if do_check:
+        out_cpp.write(f'    {refcheck_if}\n')
+        out_cpp.write( '    if (s_check_refs)\n')
+        out_cpp.write( '    {\n')
+        out_cpp.write(f'        s_{classname}_refs_check.change({this}, __FILE__, __LINE__, __FUNCTION__, {delta});\n')
+        out_cpp.write( '    }\n')
+        out_cpp.write( '    #endif\n')
+    if do_keepdrop:
+        classname, keepfn, dropfn = get_keep_drop(cursor_struct)
+        if delta == 0:
+            pass
+        elif delta == +1:
+            out_cpp.write( f'    {drop_fn}({this}.m_internal);\n')
+        elif delta == -1:
+            out_cpp.write( f'    {keep_fn}({this}.m_internal);\n')
+        else:
+            assert 0
+
 
 def class_constructor_default(
         tu,
@@ -4938,10 +4976,10 @@ def refcount_check_code( out, refcheck_if):
 
                 static RefsCheck<fz_document, FzDocument> s_FzDocument_refs_check;
 
-            Then if s_check_refs is true, each constructor function calls
-            .add(), the destructor calls .remove() and other class functions
-            call .check(). This ensures that we check reference counting after
-            each class operation.
+            Then if s_check_refs is true, constructor functions call .add(),
+            the destructor calls .remove() and other class functions call
+            .check(). This ensures that we check reference counting after each
+            class operation.
 
             If <allow_int_this> is true, we allow _this->m_internal to be
             an invalid pointer less than 4096, in which case we don't try
@@ -4969,6 +5007,10 @@ def refcount_check_code( out, refcheck_if):
                     assert(m_size == 32 || m_size == 16 || m_size == 8 || m_size == -1);
                 }}
 
+                /* Called before keep/drop.
+
+                Check that refs+delta and
+                m_this_to_num[this_->m_internal]+delta are consistent. */
                 void change( const ClassWrapper* this_, const char* file, int line, const char* fn, int delta)
                 {{
                     assert( s_check_refs);
@@ -5008,6 +5050,7 @@ def refcount_check_code( out, refcheck_if):
                     if (m_size == 32)   refs = *(int32_t*) refs_ptr;
                     if (m_size == 16)   refs = *(int16_t*) refs_ptr;
                     if (m_size ==  8)   refs = *(int8_t* ) refs_ptr;
+                    refs += delta;
 
                     int& n = m_this_to_num[ this_->m_internal];
                     int n_prev = n;
