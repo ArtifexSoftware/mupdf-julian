@@ -728,105 +728,125 @@ runtime files.
 Notes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* Running tests.
+Running tests.
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-  Basic tests can be run by appending args to the `scripts/mupdfwrap.py`
-  command.
+Basic tests can be run by appending args to the `scripts/mupdfwrap.py`
+command.
 
-  This will also demonstrate how to set environment variables such as
-  `PYTHONPATH` or `LD_LIBRARY_PATH` to the MuPDF build directory.
+This will also demonstrate how to set environment variables such as
+`PYTHONPATH` or `LD_LIBRARY_PATH` to the MuPDF build directory.
 
-  * Python tests.
+* Python tests.
 
-    * `--test-python`
-    * `--test-python-gui`
+  * `--test-python`
+  * `--test-python-gui`
 
-  * C# tests.
+* C# tests.
 
-    * `--test-csharp`
-    * `--test-csharp-gui`
+  * `--test-csharp`
+  * `--test-csharp-gui`
 
-  * C++ tests.
+* C++ tests.
 
-    * `--test-cpp`
-
-* C++ bindings and `NDEBUG`.
-
-  When building client code that uses the C++ bindings, `NDEBUG` must
-  be defined/undefined to match how the C++ bindings were built. By
-  default the C++ bindings are a release build with `NDEBUG` defined, so
-  usually client code must also be built with `NDEBUG` defined. Otherwise
-  there will be build errors for missing C++ destructors, for example
-  `mupdf::FzMatrix::~FzMatrix()`.
-
-  [This is because we define some destructors in debug builds only; this allows
-  internal reference counting checks.]
-
-* Specifying the location of Visual Studio's `devenv.com` on Windows.
-
-  `scripts/mupdfwrap.py` looks for Visual Studio's `devenv.com` in
-  standard locations; this can be overridden with:
-
-  .. code-block:: shell
-
-      python scripts/mupdfwrap.py -b --devenv <devenv.com-location> ...
-
-* Specifying compilers.
-
-  On non-Windows, we use `cc` and `c++` as default C and C++ compilers;
-  override by setting environment variables `$CC` and `$CXX`.
-
-* OpenBSD `libclang`.
-
-  *
-    `libclang` cannot be installed with pip on OpenBSD - wheels are not
-    available and building from source fails.
-
-    However unlike on other platforms, the system python-clang package
-    (`py3-llvm`) is integrated with the system's libclang and can be
-    used directly.
-
-    So the above examples use `pkg_add py3-llvm`.
-
-* Alternatives to Python package `libclang` generally do not work.
-
-  For example pypi.org's `clang <https://pypi.org/project/clang/>`_, or
-  Debian's `python-clang <https://packages.debian.org/search?keywords=python+clang&searchon=names&suite=stable&section=all>`_.
-
-  These are inconvenient to use because they require explicit setting of
-  `LD_LIBRARY_PATH` to point to the correct libclang dynamic library.
-
-* Debug builds.
-
-  One can specify a debug build using the `-d <build-directory>` arg
-  before `-b`.
-
-  .. code-block:: shell
-
-      python ./scripts/mupdfwrap.py -d build/shared-debug -b ...
-
-  *
-    Debug builds of the Python and C# bindings on Windows have not been
-    tested. There may be issues with requiring a debug version of the Python
-    interpreter, for example `python311_d.lib`.
-
-*
-  C# build failure: `cstring.i not implemented for this target` and/or
-  `Unknown directive '%cstring_output_allocate'`.
-
-  This is probably because SWIG does not include support for C#. This
-  has been seen in the past but as of 2023-07-19 pypi.org's default swig
-  seems ok.
-
-  A possible solution is to install SWIG using the system package
-  manager, for example `sudo apt install swig` on Linux, or use
-  `./scripts/mupdfwrap.py --swig-windows-auto ...` on Windows.
+  * `--test-cpp`
 
 
-* More information about running `scripts/mupdfwrap.py`.
+C++ bindings and `NDEBUG`.
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-  * Run `python ./scripts/mupdfwrap.py -h`.
-  * Read the doc-string at beginning of `scripts/wrap/__main__.py+`.
+When building client code that uses the C++ bindings, `NDEBUG` must be
+defined/undefined to match how the C++ bindings were built. By default the C++
+bindings are built as a release build with `NDEBUG` defined, so usually client
+code must also be built with `NDEBUG` defined.
+
+This is because we define some destructors in debug builds only; this allows
+internal reference counting checks.
+
+If the settings are incompatible things can go wrong in different ways, for
+example:
+
+* Link errors for missing C++ destructors, for example `mupdf::FzMatrix::~FzMatrix()`.
+* Runtime SEGVs.
+
+To mitigate SEGVs, one can do a runtime check by calling
+`mupdf::internal_check_ndebug()`. If the caller's NDEBUG setting differs
+from that of the C++ bindings when it was built, it will output a message to
+`stderr` and call `abort()`.
+
+
+Specifying the location of Visual Studio's `devenv.com` on Windows.
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+`scripts/mupdfwrap.py` looks for Visual Studio's `devenv.com` in standard
+locations; this can be overridden with:
+
+.. code-block:: shell
+
+    python scripts/mupdfwrap.py -b --devenv <devenv.com-location> ...
+
+
+Specifying compilers.
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+On non-Windows, we use `cc` and `c++` as default C and C++ compilers; override
+by setting environment variables `$CC` and `$CXX`.
+
+
+OpenBSD `libclang`.
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+`libclang` cannot be installed with pip on OpenBSD - wheels are not available
+and building from source fails.
+
+However unlike on other platforms, the system python-clang package (`py3-llvm`)
+is integrated with the system's libclang and can be used directly.
+
+So the above examples use `pkg_add py3-llvm`.
+
+
+Alternatives to Python package `libclang` generally do not work.
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+For example pypi.org's `clang <https://pypi.org/project/clang/>`_, or Debian's
+`python-clang
+<https://packages.debian.org/search?keywords=python+clang&searchon=names&suite=stable&section=all>`_.
+
+These are inconvenient to use because they require explicit setting of
+`LD_LIBRARY_PATH` to point to the correct libclang dynamic library.
+
+
+Debug builds.
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+One can specify a debug build using the `-d <build-directory>` arg before `-b`.
+
+.. code-block:: shell
+
+    python ./scripts/mupdfwrap.py -d build/shared-debug -b ...
+
+Debug builds of the Python and C# bindings on Windows.
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+These have not been tested. There may be issues with requiring a debug version
+of the Python interpreter, for example `python311_d.lib`.
+
+C# build failure: `cstring.i not implemented for this target` and/or `Unknown directive '%cstring_output_allocate'`.
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+This is probably because SWIG does not include support for C#. This has been
+seen in the past but as of 2023-07-19 pypi.org's default swig seems ok.
+
+A possible solution is to install SWIG using the system package manager, for
+example `sudo apt install swig` on Linux, or use `./scripts/mupdfwrap.py
+--swig-windows-auto ...` on Windows.
+
+
+More information about running `scripts/mupdfwrap.py`.
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+* Run `python ./scripts/mupdfwrap.py -h`.
+* Read the doc-string at beginning of `scripts/wrap/__main__.py+`.
 
 
 How `scripts/mupdfwrap.py` builds the APIs
