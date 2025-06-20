@@ -74,10 +74,10 @@ def make_outparam_helper_csharp(
     # and they are generally binary data so cannot be handled generically.
     #
     if parse.is_pointer_to(cursor.result_type, 'unsigned char'):
-        omit = f'Cannot generate C# out-param wrapper for {cursor.mangled_name} because it returns unsigned char*.'
+        omit = f'returns unsigned char*.'
 
     elif parse.is_pointer_to(cursor.result_type, 'void'):
-        omit = 'Cannot generate C# out-param wrapper for {cursor.mangled_name} because it returns void*, which is not valid in C# tuple.'
+        omit = 'returns void*, which is not valid in C# tuple.'
 
     else:
         for arg in parse.get_args( tu, cursor):
@@ -95,11 +95,11 @@ def make_outparam_helper_csharp(
                 break
             if arg.cursor.type.kind == state.clang.cindex.TypeKind.POINTER:
                 pointee = state.get_name_canonical( arg.cursor.type.get_pointee())
-                if pointee.kind == state.clang.cindex.TypeKind.ENUM:
+                if 0 and pointee.kind == state.clang.cindex.TypeKind.ENUM:
                     omit = f'has enum out-param arg.'
                     break
                 if pointee.kind == state.clang.cindex.TypeKind.FUNCTIONPROTO:
-                    omit = 'has fn-ptr arg.'
+                    omit = 'has fn-ptr out-param.'
                     break
                 if pointee.is_const_qualified():
                     # Not an out-param.
@@ -119,7 +119,7 @@ def make_outparam_helper_csharp(
         omit = f'would require > 7-tuple.'
 
     if omit:
-        message = f'Omitting C# out-param wrapper for {cursor.mangled_name}() because {omit}'
+        message = f'Omitting C# out-param wrapper for {cursor.mangled_name}() because it {omit}'
         jlib.log(message, level=1, nv=0)
         write(f'\n')
         write(f'/*\n')
@@ -132,6 +132,11 @@ def make_outparam_helper_csharp(
     assert num_return_values
     arg0, _ = parse.get_first_arg( tu, cursor)
     if not arg0.alt:
+        write(f'\n')
+        write(f'/*\n')
+        write(f'Not writing out-params wrapper for {cursor.mangled_name}() because not a wrapper class member function.\n')
+        write(f'*/\n')
+        write(f'\n')
         return
 
     method_name = rename.method( arg0.alt.type.spelling, fnname)
