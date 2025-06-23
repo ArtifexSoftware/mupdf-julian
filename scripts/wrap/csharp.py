@@ -74,10 +74,10 @@ def make_outparam_helper_csharp(
     # and they are generally binary data so cannot be handled generically.
     #
     if parse.is_pointer_to(cursor.result_type, 'unsigned char'):
-        omit = f'Cannot generate C# out-param wrapper for {cursor.mangled_name} because it returns unsigned char*.'
+        omit = f'returns unsigned char*.'
 
     elif parse.is_pointer_to(cursor.result_type, 'void'):
-        omit = 'Cannot generate C# out-param wrapper for {cursor.mangled_name} because it returns void*, which is not valid in C# tuple.'
+        omit = 'returns void*, which is not valid in C# tuple.'
 
     else:
         for arg in parse.get_args( tu, cursor):
@@ -95,11 +95,11 @@ def make_outparam_helper_csharp(
                 break
             if arg.cursor.type.kind == state.clang.cindex.TypeKind.POINTER:
                 pointee = state.get_name_canonical( arg.cursor.type.get_pointee())
-                if pointee.kind == state.clang.cindex.TypeKind.ENUM:
+                if 0 and pointee.kind == state.clang.cindex.TypeKind.ENUM:
                     omit = f'has enum out-param arg.'
                     break
                 if pointee.kind == state.clang.cindex.TypeKind.FUNCTIONPROTO:
-                    omit = 'has fn-ptr arg.'
+                    omit = 'has fn-ptr out-param.'
                     break
                 if pointee.is_const_qualified():
                     # Not an out-param.
@@ -119,7 +119,7 @@ def make_outparam_helper_csharp(
         omit = f'would require > 7-tuple.'
 
     if omit:
-        message = f'Omitting C# out-param wrapper for {cursor.mangled_name}() because {omit}'
+        message = f'Omitting C# out-param wrapper for {cursor.mangled_name}() because it {omit}'
         jlib.log(message, level=1, nv=0)
         write(f'\n')
         write(f'/*\n')
@@ -130,168 +130,243 @@ def make_outparam_helper_csharp(
 
     # Write C# wrapper.
     assert num_return_values
+
     arg0, _ = parse.get_first_arg( tu, cursor)
-    if not arg0.alt:
-        return
 
-    method_name = rename.method( arg0.alt.type.spelling, fnname)
+    def write_wrapper(method, ret):
 
-    write(f'\n')
-    write(f'// Out-params extension method for C# class {rename.class_(arg0.alt.type.spelling)} (wrapper for MuPDF struct {arg0.alt.type.spelling}),\n')
-    write(f'// adding class method {method_name}() (wrapper for {fnname}())\n')
-    write(f'// which returns out-params directly.\n')
-    write(f'//\n')
-    write(f'public static class mupdf_{main_name}_outparams_helper\n')
-    write(f'{{\n')
-    write(f'    public static ')
+        assert ret in ('tuple', 'ref')
+        #if not arg0.alt:
+        #    write(f'\n')
+        #    write(f'/*\n')
+        #    write(f'Not writing out-params wrapper for {cursor.mangled_name}() because not a wrapper class member function.\n')
+        #    write(f'*/\n')
+        #    write(f'\n')
+        #    return
 
-    def write_type(alt, type_):
-        if alt:
-            write(f'mupdf.{rename.class_(alt.type.spelling)}')
-        elif parse.is_pointer_to(type_, 'char'):
-            write( f'string')
+        if method:
+            method_name = rename.method( arg0.alt.type.spelling, fnname)
+
+        write(f'\n')
+        if method:
+            write(f'// Out-params extension method for C# class {rename.class_(arg0.alt.type.spelling)} (wrapper for MuPDF struct {arg0.alt.type.spelling}),\n')
+            write(f'// adding class method {method_name}() (wrapper for {fnname}())\n')
+            write(f'// which returns out-params directly.\n')
+            write(f'//\n')
+            write(f'public static class mupdf_{main_name}_outparams_helper\n')
         else:
-            text = cpp.declaration_text(type_, '').strip()
-            if text == 'int16_t':           text = 'short'
-            elif text == 'int64_t':         text = 'long'
-            elif text == 'size_t':          text = 'ulong'
-            elif text == 'unsigned int':    text = 'uint'
-            elif text.startswith('enum '):
-                # This is primarily for enum pdf_zugferd_profile; C# does not
-                # like `enum` prefix, and we need to specify namespace name
-                # `mupdf`.
-                text = text[5:]
-                if text.startswith('pdf_') or text.startswith('fz_'):
-                    text = f'{rename.namespace()}.{text}'
-            write(f'{text}')
+            write(f'// Out-params overload for {fnname}() which returns out-params directly.\n')
+            write(f'//\n')
+            write(f'namespace mupdf {{ [Extension] public static class mupdf\n')
 
-    # Generate the returned tuple.
-    #
-    if num_return_values > 1:
-        write('(')
+        write(f'{{\n')
+        write(f'    public ')
+        if 1 or method:
+            write(f'static ')
 
-    sep = ''
-
-    # Returned param, if any.
-    if not return_void:
-        return_alt = None
-        base_type_cursor, base_typename, extras = parse.get_extras( tu, cursor.result_type)
-        if extras:
-            if extras.opaque:
-                # E.g. we don't have access to definition of fz_separation,
-                # but it is marked in classextras with opaque=true, so
-                # there will be a wrapper class.
-                return_alt = base_type_cursor
-            elif base_type_cursor.kind == state.clang.cindex.CursorKind.STRUCT_DECL:
-                return_alt = base_type_cursor
-        write_type(return_alt, cursor.result_type)
-        sep = ', '
-
-    # Out-params.
-    for arg in parse.get_args( tu, cursor):
-        if arg.out_param:
-            write(sep)
-            write_type(arg.alt, arg.cursor.type.get_pointee())
-            if num_return_values > 1:
-                write(f' {arg.name_csharp}')
-            sep = ', '
-
-    if num_return_values > 1:
-        write(')')
-
-    # Generate function name and params. If first arg is a wrapper class we
-    # use C#'s 'this' keyword to make this a member function of the wrapper
-    # class.
-    #jlib.log('outputs fn {fnname=}: is member: {"yes" if arg0.alt else "no"}')
-    write(f' ')
-    write( method_name if arg0.alt else 'fn')
-    write(f'(')
-    if arg0.alt: write('this ')
-    sep = ''
-    for arg in parse.get_args( tu, cursor):
-        if arg.out_param:
-            continue
-        write(sep)
-        if arg.alt:
-            # E.g. 'Document doc'.
-            write(f'mupdf.{rename.class_(arg.alt.type.spelling)} {arg.name_csharp}')
-        elif parse.is_pointer_to(arg.cursor.type, 'char'):
-            write(f'string {arg.name_csharp}')
-        else:
-            text = cpp.declaration_text(arg.cursor.type, arg.name_csharp).strip()
-            text = util.clip(text, 'const ')
-            text = text.replace('int16_t ', 'short ')
-            text = text.replace('int64_t ', 'long ')
-            text = text.replace('size_t ', 'uint ')
-            text = text.replace('unsigned int ', 'uint ')
-            write(text)
-        sep = ', '
-    write(f')\n')
-
-    # Function body.
-    #
-    write(f'    {{\n')
-
-    # Create local outparams struct.
-    write(f'        var outparams = new mupdf.{main_name}_outparams();\n')
-    write(f'        ')
-
-    # Generate function call.
-    #
-    # The C# *_outparams_fn() generated by swig is inside namespace mupdf {
-    # class mupdf { ... } }, so we access it using the rather clumsy prefix
-    # 'mupdf.mupdf.'. It will have been generated from a C++ function
-    # (generate by us) which is in top-level namespace mupdf, but swig
-    # appears to generate the same code even if the C++ function is not in
-    # a namespace.
-    #
-    if not return_void:
-        write(f'var ret = ')
-    write(f'mupdf.mupdf.{main_name}_outparams_fn(')
-    sep = ''
-    for arg in parse.get_args( tu, cursor):
-        if arg.out_param:
-            continue
-        write(f'{sep}{arg.name_csharp}')
-        if arg.alt:
-            extras = parse.get_fz_extras( tu, arg.alt.type.spelling)
-            assert extras.pod != 'none' \
-                    'Cannot pass wrapper for {type_.spelling} as arg because pod is "none" so we cannot recover struct.'
-            write('.internal_()' if extras.pod == 'inline' else '.m_internal')
-        sep = ', '
-    write(f'{sep}outparams);\n')
-
-    # Generate return of tuple.
-    write(f'        return ')
-    if num_return_values > 1:
-        write(f'(')
-    sep = ''
-    if not return_void:
-        if return_alt:
-            write(f'new mupdf.{rename.class_(return_alt.type.spelling)}(ret)')
-        else:
-            write(f'ret')
-        sep = ', '
-    for arg in parse.get_args( tu, cursor):
-        if arg.out_param:
-            write(f'{sep}')
-            type_ = arg.cursor.type.get_pointee()
-            if arg.alt:
-                    write(f'new mupdf.{rename.class_(arg.alt.type.spelling)}(outparams.{arg.name_csharp})')
-            elif 0 and parse.is_pointer_to(type_, 'char'):
-                # This was intended to convert char* to string, but swig
-                # will have already done that when making a C# version of
-                # the C++ struct, and modern csc on Windows doesn't like
-                # creating a string from a string for some reason.
-                write(f'new string(outparams.{arg.name_csharp})')
+        def write_type(alt, type_):
+            if alt:
+                write(f'mupdf.{rename.class_(alt.type.spelling)}')
+            elif parse.is_pointer_to(type_, 'char'):
+                write( f'string')
             else:
-                write(f'outparams.{arg.name_csharp}')
+                text = cpp.declaration_text(type_, '').strip()
+                if text == 'int16_t':           text = 'short'
+                elif text == 'int64_t':         text = 'long'
+                elif text == 'size_t':          text = 'ulong'
+                elif text == 'unsigned int':    text = 'uint'
+                elif text.startswith('enum '):
+                    # This is primarily for enum pdf_zugferd_profile; C# does not
+                    # like `enum` prefix, and we need to specify namespace name
+                    # `mupdf`.
+                    text = text[5:]
+                    if text.startswith('pdf_') or text.startswith('fz_'):
+                        text = f'{rename.namespace()}.{text}'
+                write(f'{text}')
+
+        if return_void:
+            return_alt = None
+            retrn_type = None
+        else:
+            return_alt = None
+            base_type_cursor, base_typename, extras = parse.get_extras( tu, cursor.result_type)
+            if extras:
+                if extras.opaque:
+                    # E.g. we don't have access to definition of fz_separation,
+                    # but it is marked in classextras with opaque=true, so
+                    # there will be a wrapper class.
+                    return_alt = base_type_cursor
+                elif base_type_cursor.kind == state.clang.cindex.CursorKind.STRUCT_DECL:
+                    return_alt = base_type_cursor
+            write_type(return_alt, cursor.result_type)
             sep = ', '
-    if num_return_values > 1:
-        write(')')
-    write(';\n')
-    write(f'    }}\n')
-    write(f'}}\n')
+
+        if ret == 'tuple':
+            # Generate the returned tuple.
+            #
+            if num_return_values > 1:
+                write('(')
+
+            sep = ''
+
+            # Returned param, if any.
+
+            # Out-params.
+            for arg in parse.get_args( tu, cursor):
+                if arg.out_param:
+                    write(sep)
+                    write_type(arg.alt, arg.cursor.type.get_pointee())
+                    if num_return_values > 1:
+                        write(f' {arg.name_csharp}')
+                    sep = ', '
+
+            if num_return_values > 1:
+                write(')')
+
+        else:
+            if return_void:
+                write(f'void ')
+            else:
+                write_type(return_alt, cursor.result_type)
+
+        # Generate function name and params. If first arg is a wrapper class we
+        # use C#'s 'this' keyword to make this a member function of the wrapper
+        # class.
+        #jlib.log('outputs fn {fnname=}: is member: {"yes" if arg0.alt else "no"}')
+        write(f' ')
+        if method:
+            write(method_name)
+        else:
+            write(fnname)
+        write(f'(')
+        if method:
+            write('this ')
+        sep = ''
+        for arg in parse.get_args( tu, cursor):
+            if not arg.out_param or ret == 'ref':
+                write(sep)
+                if arg.out_param and ret == 'ref':
+                    write(f'ref ')
+                    text = cpp.declaration_text(arg.cursor.type.get_pointee(), arg.name_csharp).strip()
+                    text = util.clip(text, 'const ')
+                    text = text.replace('int16_t ', 'short ')
+                    text = text.replace('int64_t ', 'long ')
+                    text = text.replace('size_t ', 'uint ')
+                    text = text.replace('unsigned int ', 'uint ')
+                    write(text)
+                else:
+                    if arg.alt:
+                        # E.g. 'Document doc'.
+                        write(f'mupdf.{rename.class_(arg.alt.type.spelling)} {arg.name_csharp}')
+                    elif parse.is_pointer_to(arg.cursor.type, 'char'):
+                        write(f'string {arg.name_csharp}')
+                    else:
+                        text = cpp.declaration_text(arg.cursor.type, arg.name_csharp).strip()
+                        text = util.clip(text, 'const ')
+                        text = text.replace('int16_t ', 'short ')
+                        text = text.replace('int64_t ', 'long ')
+                        text = text.replace('size_t ', 'uint ')
+                        text = text.replace('unsigned int ', 'uint ')
+                        write(text)
+                sep = ', '
+        write(f')\n')
+
+        # Function/method body.
+        #
+        write(f'    {{\n')
+
+        if 0:
+            # Just call the function.
+            write(f'        return {fnname}(')
+            sep = ''
+            for arg in parse.get_args( tu, cursor):
+                if arg.out_param:
+                    continue
+                write(sep)
+                write(arg.name_csharp)
+                sep = ', '
+            write(f');\n')
+
+        else:
+            # Create local outparams struct.
+            write(f'        var outparams = new mupdf.{main_name}_outparams();\n')
+            write(f'        ')
+
+            # Generate function call.
+            #
+            # The C# *_outparams_fn() generated by swig is inside namespace mupdf {
+            # class mupdf { ... } }, so we access it using the rather clumsy prefix
+            # 'mupdf.mupdf.'. It will have been generated from a C++ function
+            # (generate by us) which is in top-level namespace mupdf, but swig
+            # appears to generate the same code even if the C++ function is not in
+            # a namespace.
+            #
+            if not return_void:
+                write(f'var ret = ')
+            write(f'mupdf.mupdf.{main_name}_outparams_fn(')
+            sep = ''
+            for arg in parse.get_args( tu, cursor):
+                if arg.out_param:
+                    continue
+                write(f'{sep}{arg.name_csharp}')
+                if arg.alt:
+                    extras = parse.get_fz_extras( tu, arg.alt.type.spelling)
+                    assert extras.pod != 'none' \
+                            'Cannot pass wrapper for {type_.spelling} as arg because pod is "none" so we cannot recover struct.'
+                    write('.internal_()' if extras.pod == 'inline' else '.m_internal')
+                sep = ', '
+            write(f'{sep}outparams);\n')
+
+            if ret == 'tuple':
+                # Generate return of tuple.
+                write(f'        return ')
+                if num_return_values > 1:
+                    write(f'(')
+                sep = ''
+                if not return_void:
+                    if return_alt:
+                        write(f'new mupdf.{rename.class_(return_alt.type.spelling)}(ret)')
+                    else:
+                        write(f'ret')
+                    sep = ', '
+                for arg in parse.get_args( tu, cursor):
+                    if arg.out_param:
+                        write(f'{sep}')
+                        type_ = arg.cursor.type.get_pointee()
+                        if arg.alt:
+                                write(f'new mupdf.{rename.class_(arg.alt.type.spelling)}(outparams.{arg.name_csharp})')
+                        elif 0 and parse.is_pointer_to(type_, 'char'):
+                            # This was intended to convert char* to string, but swig
+                            # will have already done that when making a C# version of
+                            # the C++ struct, and modern csc on Windows doesn't like
+                            # creating a string from a string for some reason.
+                            write(f'new string(outparams.{arg.name_csharp})')
+                        else:
+                            write(f'outparams.{arg.name_csharp}')
+                        sep = ', '
+                if num_return_values > 1:
+                    write(')')
+                write(';\n')
+
+            elif ret == 'ref':
+                # Copy outparams into `ref` args.
+                for arg in parse.get_args( tu, cursor):
+                    if arg.out_param:
+                        write(f'        {arg.name_csharp} = outparams.{arg.name_csharp};\n')
+                if not return_void:
+                    write(f'return ret;\n')
+            else:
+                assert 0
+
+        write(f'    }}\n')
+        if ret == 'ref':
+            write(f'}}\n')
+        write(f'}}\n')
+
+    write_wrapper(method=False, ret='ref')
+
+    if arg0.alt:
+        write_wrapper(method=True, ret='tuple')
 
 
 def csharp_settings(build_dirs):
