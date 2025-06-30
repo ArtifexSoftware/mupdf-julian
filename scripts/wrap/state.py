@@ -375,5 +375,7 @@ class BuildDirs:
             return 'Debug'
         elif 'release' in dir_so_flags:
             return 'Release'
+        elif 'memento' in dir_so_flags:
+            return 'Memento'
         else:
             assert 0, f'Expecting "-release-" or "-debug-" in build_dirs.dir_so={self.dir_so}'
