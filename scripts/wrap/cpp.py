@@ -5359,6 +5359,7 @@ def cpp_source(
                 '-D', 'MUPDF_WRAP_LIBCLANG',
                 '-D', 'FZ_FUNCTION=',
                 ]
+        jlib.log(f'Calling index.parse().')
         tu = index.parse(
                 temp_h,
                 args = args,
@@ -5367,19 +5368,38 @@ def cpp_source(
                         | state.clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
                         ,
                 )
+        jlib.log(f'index.parse() returned.')
 
         # Show warnings/errors from the parse. Failure to include stddef.h
         # appears to be harmless on Linux, but other failures seem to cause
         # more problems.
         #
-        def show_clang_diagnostic( diagnostic, depth=0):
+        def show_clang_diagnostic( diagnostic, depth=None):
+            jlib.log(f'show_clang_diagnostic().')
+            if depth is None:
+                depth = list()
+            jlib.log(f'# {diagnostic=}', nv=0)
+            depth.append(diagnostic)
             for diagnostic2 in diagnostic.children:
-                show_clang_diagnostic( diagnostic2, depth + 1)
-            jlib.log1( '{" "*4*depth}{diagnostic}')
+                if diagnostic2 in depth:
+                    jlib.log(f'recurse: {diagnostic}', nv=0)
+                else:
+                    show_clang_diagnostic( diagnostic2, depth)
+            del depth[-1]
+            jlib.log( '{" "*4*len(depth)}{diagnostic}', nv=0)
+
+        jlib.log(f'Looking at tu.diagnostics')
         if tu.diagnostics:
-            jlib.log1( 'tu.diagnostics():')
-            for diagnostic in tu.diagnostics:
-                show_clang_diagnostic(diagnostic, 1)
+            jlib.log(f'tu.diagnostics is true.')
+            jlib.log( 'tu.diagnostics():', nv=0)
+
+            if 0:
+                for diagnostic in tu.diagnostics:
+                    jlib.log(f'Calling show_clang_diagnostic().')
+                    show_clang_diagnostic(diagnostic, [None])
+                jlib.log('Have shown diagmostics.')
+        else:
+            jlib.log(f'tu.diagnostics is false.')
 
     finally:
         if os.path.isfile( temp_h):
