@@ -120,12 +120,14 @@ public class HelloWorld
             throw new System.Exception("Failed to open filename containing 4-byte unicode character");
         }
 
+        /*
         {
             mupdf.FzDocument barcode_document = new mupdf.FzDocument("../test_barcode_out.pdf");
             //mupdf.FzPage page = document_barcode.fz_load_page(0);
             mupdf.FzPixmap barcode_pixmap = new mupdf.FzPixmap(barcode_document, 0);
             (var barcode_text, var barcode_type) = mupdf.fz_decode_barcode_from_pixmap2(barcode_pixmap, 0);
         }
+        */
 
         System.Console.WriteLine("MuPDF C# test finished.");
     }

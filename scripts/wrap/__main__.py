@@ -549,6 +549,9 @@ Usage:
 
     Args:
 
+        -a <env_args>
+            Read next arg(s) from environmental variables <env_args>.
+
         -b      [<args>] <actions>:
         --build [<args>] <actions>:
             Builds some or all of the C++ and python interfaces.
@@ -2440,6 +2443,12 @@ def main2():
 
             if arg == '-h' or arg == '--help':
                 print( __doc__)
+
+            elif arg == '-a':
+                _name = next(args)
+                _value = os.environ.get(_name, '')
+                _args = shlex.split(_value) + list(args)
+                args = jlib.Args(_args)
 
             elif arg == '--build' or arg == '-b':
                 build( build_dirs, swig_command, args, vs_upgrade, make_command)
