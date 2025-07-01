@@ -2429,7 +2429,7 @@ def main2():
     vs_upgrade = False
 
     args = jlib.Args( sys.argv[1:])
-    arg_i = 0
+    venv_arg_i = 0
     while 1:
         try:
             arg = args.next()
@@ -2437,7 +2437,7 @@ def main2():
             break
         #log( 'Handling {arg=}')
 
-        arg_i += 1
+        venv_arg_i += 1
 
         with jlib.LogPrefixScope( f'{arg}: '):
 
@@ -2445,10 +2445,11 @@ def main2():
                 print( __doc__)
 
             elif arg == '-a':
-                _name = next(args)
+                _name = args.next()
                 _value = os.environ.get(_name, '')
-                _args = shlex.split(_value) + list(args)
+                _args = shlex.split(_value) + list(args.items)
                 args = jlib.Args(_args)
+                venv_arg_i -= 1
 
             elif arg == '--build' or arg == '-b':
                 build( build_dirs, swig_command, args, vs_upgrade, make_command)
@@ -2559,6 +2560,16 @@ def main2():
                 d = args.next()
                 build_dirs.set_dir_so( d)
                 #jlib.log('Have set {build_dirs=}')
+
+            elif arg == '-o':
+                os_names = args.next().split(',')
+                if platform.system().lower() not in os_names:
+                    jlib.log(f'Not running because {platform.system().lower()=} not in {os_names=}')
+                    return
+                # It's ok for '-o' to be before `--venv`.
+                jlib.log(f'{venv_arg_i=}')
+                venv_arg_i -= 1
+                jlib.log(f'{venv_arg_i=}')
 
             elif arg == '--py-package-multi':
                 # Investigating different combinations of pip, pyproject.toml,
@@ -2983,7 +2994,7 @@ def main2():
 
             elif arg in ('--venv' '--venv-force-reinstall'):
                 force_reinstall = ' --force-reinstall' if arg == '--venv-force-reinstall' else ''
-                assert arg_i == 1, f'If specified, {arg} should be the first argument.'
+                assert venv_arg_i == 1, f'If specified, {arg} should be the first argument. {venv_arg_i=}'
                 venv = f'venv-mupdfwrap-{state.python_version()}-{state.cpu_name()}'
                 # Oddly, shlex.quote(sys.executable), which puts the name
                 # inside single quotes, doesn't work - we get error `The
