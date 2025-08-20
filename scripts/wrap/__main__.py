@@ -2912,7 +2912,10 @@ def main2():
                 if 1:
                     # Build and run test using minimal swig library to test
                     # handling of Unicode strings.
-                    swig.test_swig_csharp()
+                    swig.test_swig_csharp_unicode()
+
+            elif arg == '--test-csharp-exceptions':
+                swig.test_swig_charp_exceptions()
 
             elif arg == '--test-csharp-gui':
                 csc, mono, mupdf_cs = csharp.csharp_settings(build_dirs)
