@@ -28,7 +28,7 @@
 static fz_image *pdf_load_jpx(fz_context *ctx, pdf_document *doc, pdf_obj *dict, int forcemask);
 
 static fz_image *
-pdf_load_jpx_imp(fz_context *ctx, pdf_document *doc, pdf_obj *rdb, pdf_obj *dict, fz_stream *cstm, int forcemask)
+pdf_load_jpx_imp(fz_context *ctx, pdf_document *doc, pdf_resource_stack *rdb, pdf_obj *dict, fz_stream *cstm, int forcemask)
 {
 	fz_image *image = pdf_load_jpx(ctx, doc, dict, forcemask);
 
