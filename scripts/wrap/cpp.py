@@ -5325,13 +5325,22 @@ def cpp_source(
         # more problems.
         #
         def show_clang_diagnostic( diagnostic, depth=0):
-            for diagnostic2 in diagnostic.children:
-                show_clang_diagnostic( diagnostic2, depth + 1)
-            jlib.log1( '{" "*4*depth}{diagnostic}')
+            jlib.log(f'{depth=}')
+            jlib.log(f'{len(diagnostic.children)=}')
+            if depth > 20:
+                jlib.log1(f'Terminating recursion because {depth=}.')
+                return
+            #try:
+            #    jlib.log1( f'{depth=} {" "*4*depth}{diagnostic}')
+            #except Exception as e:
+            #    jlib.log1( f'{depth=}: failed to print <diagnostic>: {e}')
+            #for diagnostic2 in diagnostic.children:
+            #    show_clang_diagnostic( diagnostic2, depth + 1)
         if tu.diagnostics:
             jlib.log1( 'tu.diagnostics():')
-            for diagnostic in tu.diagnostics:
-                show_clang_diagnostic(diagnostic, 1)
+            #jlib.log1( f'{len(tu.diagnostics())=}:')
+            #for diagnostic in tu.diagnostics:
+            #    show_clang_diagnostic(diagnostic, 1)
 
     finally:
         if os.path.isfile( temp_h):
